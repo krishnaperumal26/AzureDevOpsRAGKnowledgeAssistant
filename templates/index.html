@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Azure DevOps RAG Tool</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body {
+            background: linear-gradient(120deg, #a1c4fd 0%, #c2e9fb 100%);
+            min-height: 100vh;
+        }
+        .chat-container {
+            max-width: 700px;
+            margin: 32px auto;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 4px 24px #0002;
+            padding: 32px 28px 24px 28px;
+            border: 2px solid #e3f0fc;
+        }
+        h1 {
+            background: linear-gradient(90deg, #0078d4 30%, #00c6fb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 2.2em;
+            margin-bottom: 18px;
+            text-align: center;
+        }
+        .chat-log {
+            height: 340px;
+            overflow-y: auto;
+            background: linear-gradient(120deg, #f4faff 0%, #eaf6fb 100%);
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 18px;
+            border: 1.5px solid #b3e0fc;
+        }
+        .chat-msg {
+            margin-bottom: 14px;
+            padding: 10px 16px;
+            border-radius: 18px;
+            max-width: 80%;
+            display: inline-block;
+            font-size: 1.08em;
+            box-shadow: 0 2px 8px #0001;
+            position: relative;
+            animation: fadeIn 0.4s;
+        }
+        .chat-msg.user {
+            background: linear-gradient(90deg, #a1c4fd 0%, #c2e9fb 100%);
+            color: #222;
+            float: right;
+            clear: both;
+            border-bottom-right-radius: 4px;
+        }
+        .chat-msg.bot {
+            background: linear-gradient(90deg, #eafbe7 0%, #b2f7ef 100%);
+            color: #0078d4;
+            float: left;
+            clear: both;
+            border-bottom-left-radius: 4px;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .settings-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .settings-row label {
+            flex: 1;
+            font-weight: 500;
+            color: #0078d4;
+        }
+        .settings-row input {
+            width: 100%;
+            padding: 7px 10px;
+            border-radius: 6px;
+            border: 1.5px solid #b3e0fc;
+            background: #f7fbff;
+            font-size: 1em;
+            margin-top: 2px;
+            transition: border 0.2s;
+        }
+        .settings-row input:focus {
+            border: 1.5px solid #0078d4;
+            outline: none;
+        }
+        .actions {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+        .actions form { margin: 0; }
+        .actions button, .settings-row button, .chat-input-row button {
+            background: linear-gradient(90deg, #0078d4 0%, #00c6fb 100%);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 18px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 2px 8px #0078d433;
+            transition: background 0.2s, transform 0.1s;
+        }
+        .actions button:hover, .settings-row button:hover, .chat-input-row button:hover {
+            background: linear-gradient(90deg, #00c6fb 0%, #0078d4 100%);
+            transform: translateY(-2px) scale(1.04);
+        }
+        .status {
+            margin-bottom: 12px;
+            font-weight: bold;
+            min-height: 22px;
+            text-align: center;
+            font-size: 1.08em;
+            letter-spacing: 0.5px;
+        }
+        .loading {
+            color: #ff9800;
+            animation: pulse 1s infinite alternate;
+        }
+        .error { color: #d32f2f; }
+        .success { color: #388e3c; }
+        @keyframes pulse {
+            from { opacity: 1; }
+            to { opacity: 0.5; }
+        }
+        .chat-input-row {
+            display: flex;
+            gap: 10px;
+        }
+        .chat-input-row input {
+            flex: 1;
+            padding: 9px 12px;
+            border-radius: 8px;
+            border: 1.5px solid #b3e0fc;
+            background: #f7fbff;
+            font-size: 1.08em;
+            transition: border 0.2s;
+        }
+        .chat-input-row input:focus {
+            border: 1.5px solid #0078d4;
+            outline: none;
+        }
+        .chat-msg pre {
+            margin: 0;
+            font-size: 1em;
+            font-family: inherit;
+            white-space: pre-wrap;
+        }
+        ::selection { background: #b3e0fc; }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <h1>Azure DevOps RAG Knowledge Tool</h1>
+        <div class="status" id="status"></div>
+        <form id="settingsForm" class="settings-row">
+            <label>OpenAI Key: <input type="password" id="openai_key" name="openai_key" required></label>
+            <label>Azure PAT: <input type="password" id="azure_pat" name="azure_pat" required></label>
+        </form>
+        <form id="orgProjForm" class="settings-row">
+            <label>Organization: <input type="text" id="azure_org" name="azure_org" required></label>
+            <label>Project: <input type="text" id="azure_project" name="azure_project" required></label>
+            <button type="button" onclick="saveSettings()">Save</button>
+        </form>
+        <div class="actions">
+            <form id="uploadForm" enctype="multipart/form-data">
+                <input type="file" id="file" name="file" multiple>
+                <button type="submit">Upload Docs</button>
+            </form>
+            <button onclick="updateVectorDB()">Update Vector DB</button>
+        </div>
+        <div class="chat-log" id="chatLog"></div>
+        <form id="chatForm" class="chat-input-row">
+            <input type="text" id="question" name="question" placeholder="Ask a question..." required autocomplete="off">
+            <button type="submit">Ask</button>
+        </form>
+    </div>
+    <script>
+        // --- UI State ---
+        const chatLog = document.getElementById('chatLog');
+        const statusDiv = document.getElementById('status');
+        let chatHistory = [];
+
+        // --- Local Storage for Settings ---
+        function saveSettingsToLocal() {
+            localStorage.setItem('openai_key', document.getElementById('openai_key').value);
+            localStorage.setItem('azure_pat', document.getElementById('azure_pat').value);
+            localStorage.setItem('azure_org', document.getElementById('azure_org').value);
+            localStorage.setItem('azure_project', document.getElementById('azure_project').value);
+        }
+        function loadSettingsFromLocal() {
+            if (localStorage.getItem('openai_key')) document.getElementById('openai_key').value = localStorage.getItem('openai_key');
+            if (localStorage.getItem('azure_pat')) document.getElementById('azure_pat').value = localStorage.getItem('azure_pat');
+            if (localStorage.getItem('azure_org')) document.getElementById('azure_org').value = localStorage.getItem('azure_org');
+            if (localStorage.getItem('azure_project')) document.getElementById('azure_project').value = localStorage.getItem('azure_project');
+        }
+        loadSettingsFromLocal();
+
+        // --- Save Settings to Backend ---
+        function saveSettings() {
+            const data = new FormData();
+            data.append('openai_key', document.getElementById('openai_key').value);
+            data.append('azure_pat', document.getElementById('azure_pat').value);
+            data.append('azure_org', document.getElementById('azure_org').value);
+            data.append('azure_project', document.getElementById('azure_project').value);
+            saveSettingsToLocal();
+            setStatus('Saving settings...', 'loading');
+            fetch('/set_keys', { method: 'POST', body: data })
+                .then(() => setStatus('Settings saved!', 'success'))
+                .catch(() => setStatus('Failed to save settings.', 'error'));
+        }
+
+        // --- Upload Documents ---
+        document.getElementById('uploadForm').onsubmit = function(e) {
+            e.preventDefault();
+            const input = document.getElementById('file');
+            const files = input.files;
+            if (!files.length) {
+                setStatus('Please select at least one document.', 'error');
+                return;
+            }
+            const data = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                data.append('files', files[i]);
+            }
+            setStatus('Uploading documents...', 'loading');
+            fetch('/upload_doc', { method: 'POST', body: data })
+                .then(() => setStatus('Documents uploaded!', 'success'))
+                .catch(() => setStatus('Failed to upload documents.', 'error'));
+        };
+
+        // --- Update Vector DB ---
+        function updateVectorDB() {
+            setStatus('Updating vector DB...', 'loading');
+            fetch('/update_vector_db', { method: 'POST' })
+                .then(() => setStatus('Vector DB updated!', 'success'))
+                .catch(() => setStatus('Failed to update vector DB.', 'error'));
+        }
+
+        // --- Chat Logic ---
+        document.getElementById('chatForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const question = document.getElementById('question').value;
+            appendMsg('user', question);
+            document.getElementById('question').value = '';
+            setStatus('Bot is thinking...', 'loading');
+            // Send to backend
+            const data = new FormData();
+            data.append('question', question);
+            try {
+                const resp = await fetch('/ask', { method: 'POST', body: data });
+                const html = await resp.text();
+                // Parse answer from returned HTML
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const answerDiv = doc.querySelector('.answer');
+                if (answerDiv) {
+                    appendMsg('bot', answerDiv.innerText.replace('Answer:', '').trim());
+                    setStatus('');
+                } else {
+                    appendMsg('bot', 'No answer received.');
+                    setStatus('No answer received.', 'error');
+                }
+            } catch (err) {
+                appendMsg('bot', 'Error connecting to server.');
+                setStatus('Error connecting to server.', 'error');
+            }
+        };
+
+        // --- Chat History ---
+        function appendMsg(role, text) {
+            chatHistory.push({ role, text });
+            renderChat();
+        }
+        function renderChat() {
+            chatLog.innerHTML = '';
+            chatHistory.forEach(msg => {
+                const div = document.createElement('div');
+                div.className = 'chat-msg ' + msg.role;
+                div.innerHTML = (msg.role === 'user' ? '<b>You:</b> ' : '<b>Bot:</b> ') + '<pre>' + escapeHTML(msg.text) + '</pre>';
+                chatLog.appendChild(div);
+            });
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+        function escapeHTML(str) {
+            return str.replace(/[&<>]/g, tag => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[tag]));
+        }
+
+        // --- Status Feedback ---
+        function setStatus(msg, type) {
+            statusDiv.textContent = msg;
+            statusDiv.className = 'status ' + (type || '');
+        }
+    </script>
+</body>
+</html>
