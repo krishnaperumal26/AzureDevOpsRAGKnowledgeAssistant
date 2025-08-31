@@ -40,5 +40,3 @@ This is a knowledge management and guidance tool for Scrum teams, built with Fas
 - Uploaded documents are stored in the `uploads/` folder.
 - Vector DB is stored in the `vector_db/` folder.
 
-## License
-MIT License
